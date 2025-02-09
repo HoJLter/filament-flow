@@ -1,16 +1,22 @@
 #Телеграм API
+import re
+
 from aiogram import Router, F
-from aiogram.filters import Command, CommandStart
+from aiogram.enums import ContentType
+from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, InputMediaPhoto, User
 #Асинхронность
 import asyncio
+#База данных
+import asyncpg
+
 #Импорты из проекта
 from bot.fsm import StatesData
 from bot.texts import *
 from bot.keyboards import keyboard_start_gen, keyboard_back_to_start, keyboard_order_menu, keyboard_admin_panel, \
-    keyboard_back_to_order
-
+    keyboard_back_to_order, keyboard_index_confirmation, keyboard_back_to_index
+from config import database_config
 user_router = Router()
 
 
@@ -33,12 +39,26 @@ async def welcome_command(message: Message, state: FSMContext):
                                                                'admin_panel',
                                                                'info',
                                                                'back_to_order_menu'])
-async def start_menu(callback:CallbackQuery, state: FSMContext):
-    if callback.data in ["create_order", 'back_to_order_menu']:
-        await state.update_data(order_parameters=None)
+async def main_menus(callback:CallbackQuery, state: FSMContext):
+    if callback.data == "create_order":
+        order_parameters = {
+            'order_name':None,
+            'reference':None,
+            'mail_index':None,
+            'file_id':None,
+            'file_name': None
+        }
+        await state.update_data(order_parameters=order_parameters)
         await callback.message.edit_media(media=InputMediaPhoto(media=image_order_menu,
                                                                 caption=await text_order_menu_gen(state)),
                                           reply_markup=keyboard_order_menu)
+
+    elif callback.data ==  'back_to_order_menu':
+        await state.set_state(StatesData.none_state)
+        await callback.message.edit_media(media=InputMediaPhoto(media=image_order_menu,
+                                                                caption=await text_order_menu_gen(state)),
+                                          reply_markup=keyboard_order_menu)
+
     elif callback.data == "admin_panel":
         await callback.message.edit_media(media=InputMediaPhoto(media=image_admin_panel),
                                           reply_markup=keyboard_admin_panel)
@@ -60,24 +80,24 @@ async def back_to_start_menu(callback: CallbackQuery, state: FSMContext):
                                                                'mail_index',
                                                                'send_file',
                                                                'complete_button'])
-async def order_parameters(callback: CallbackQuery, state: FSMContext):
+async def set_order_parameters(callback: CallbackQuery, state: FSMContext):
     if callback.data == "order_name":
-        await callback.message.edit_media(media=InputMediaPhoto(media=image_welcome, caption="Укажите наименование заказа:"),
+        await callback.message.edit_media(media=InputMediaPhoto(media=image_order_name, caption="Укажите наименование заказа:"),
                                           reply_markup=keyboard_back_to_order)
         await state.set_state(StatesData.waiting_for_order_name)
 
     elif callback.data == "reference":
-        await callback.message.edit_media(media=InputMediaPhoto(media=image_welcome, caption="Укажите техническое задание:"),
+        await callback.message.edit_media(media=InputMediaPhoto(media=image_reference, caption="Укажите техническое задание:"),
                                           reply_markup=keyboard_back_to_order)
         await state.set_state(StatesData.waiting_for_references)
 
     elif callback.data == "mail_index":
-        await callback.message.edit_media(media=InputMediaPhoto(media=image_welcome, caption="Укажите почтовый индекс Почты России:"),
+        await callback.message.edit_media(media=InputMediaPhoto(media=image_mail_indexes, caption="Укажите почтовый индекс Почты России:"),
                                           reply_markup=keyboard_back_to_order)
         await state.set_state(StatesData.waiting_for_index)
 
     elif callback.data == "send_file":
-        await callback.message.edit_media(media=InputMediaPhoto(media=image_welcome, caption="Отправьте .stl модель для печати"),
+        await callback.message.edit_media(media=InputMediaPhoto(media=image_file, caption="Отправьте .stl модель для печати"),
                                           reply_markup=keyboard_back_to_order)
         await state.set_state(StatesData.waiting_for_file)
 
@@ -88,18 +108,104 @@ async def order_parameters(callback: CallbackQuery, state: FSMContext):
 
 
 
-@user_router.message(StatesData.waiting_for_file or
-                     StatesData.waiting_for_index or
-                     StatesData.waiting_for_references or
-                     StatesData.waiting_for_order_name)
-async def set_params(message: Message, state:FSMContext):
+@user_router.message(StateFilter(StatesData.waiting_for_references,
+                                 StatesData.waiting_for_order_name))
+async def set_simple_params(message: Message, state:FSMContext):
     current_state = await state.get_state()
-    print(current_state)
-    if current_state == StatesData.waiting_for_file:
-        print("file")
-    elif current_state == StatesData.waiting_for_index:
-        print("index")
+    order_parameters = (await state.get_data())['order_parameters']
 
+    if current_state == StatesData.waiting_for_order_name:
+        await message.delete()
+        order_parameters['order_name'] = message.text
+        await back_to_order_config(state)
+
+    elif current_state == StatesData.waiting_for_references:
+        await message.delete()
+        order_parameters['references'] = message.text
+        await back_to_order_config(state)
+
+
+async def back_to_order_config(state: FSMContext):
+    message = (await state.get_data())['master_msg']
+    await state.set_state(StatesData.none_state)
+    await message.edit_media(media=InputMediaPhoto(media=image_order_menu,
+                                                            caption=await text_order_menu_gen(state)),
+                                      reply_markup=keyboard_order_menu)
+
+
+@user_router.message(StatesData.waiting_for_file)
+async def set_file(message: Message, state: FSMContext):
+    await message.delete()
+    try:
+        if (message.content_type == ContentType.DOCUMENT and
+            message.document.file_name.lower().endswith(".stl")):
+            order_parameters = (await state.get_data())['order_parameters']
+            order_parameters['file_name'] = message.document.file_name
+            order_parameters['file_id'] = message.document.file_id
+            await back_to_order_config(state)
+            await state.set_state(StatesData.none_state)
+        else:
+            temporary_message = await message.answer(text=f"Ошибка ‼️ Вы отправили файл разрешения "
+                                                          f".{message.document.file_name.lower().split('.')[-1]}, "
+                                                          f"а нужен .stl")
+            await asyncio.sleep(6)
+            await temporary_message.delete()
+            await state.set_state(StatesData.waiting_for_file)
+    except:
+        temporary_message = await message.answer(text="Неизвестная ошибка ‼️ Попробуйте еще раз")
+        await message.delete()
+        await asyncio.sleep(4)
+        await temporary_message.delete()
+        await state.set_state(StatesData.waiting_for_file)
+
+        # order_parameters = {
+        #     'order_name':None,
+        #     'reference':None,
+        #     'mail_index':None,
+        #     'file_id':None
+        # }
+
+@user_router.callback_query(lambda callback: callback.data == "back_to_index")
+@user_router.callback_query(lambda callback: callback.data == 'mail_index')
+async def mail_indexes(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_media(media=InputMediaPhoto(media=image_mail_indexes, caption="Отправьте индекс отделения Почты России:"),
+                                      reply_markup=keyboard_back_to_order)
+    await state.set_state(StatesData.waiting_for_index)
+
+
+@user_router.message(StatesData.waiting_for_index)
+async def set_index(message: Message, state: FSMContext):
+    connection = await asyncpg.connect(database=database_config['database'], user=database_config['user'],
+                               password=database_config['password'], host=database_config['host'])
+    formatted_index = re.sub(r'\D','' ,(message.text.replace(" ", "")))
+    response = await connection.fetchrow("SELECT index,region, autonom, area, city, city_1 "
+                                        "FROM public.mail_indexes "
+                                       f"WHERE index={formatted_index or 000000}")
+    data = await state.get_data()
+    main_message = data['master_msg']
+    await state.update_data(mail_index=message.text)
+    if response:
+        region = str(response['region']) if 'region' in response else ""
+        autonom = str(response['autonom']) if 'autonom' in response else ""
+        area = str(response['area']) if 'area' in response else ""
+        city = str(response['city']) if 'city' in response else ""
+        city_1 = str(response['city_1']) if 'city_1' in response else ""
+
+        location = (f"{region.capitalize()+',' if region else ""} "
+                    f"{autonom.capitalize()+',' if autonom else ""} "
+                    f"{area.capitalize()+',' if area else ""} "
+                    f"{city.title()} "
+                    f"{city_1.title()}")
+
+        formatted_location = " ".join(location.split())
+        await message.delete()
+        await main_message.edit_caption(caption = f"Вы указали индекс {response['index']}. "
+                                            f"Он соответствует региону {formatted_location}."
+                                            f"\nЭто верно?", reply_markup=keyboard_index_confirmation)
+    else:
+        await message.delete()
+        await state.update_data(mail_index=None)
+        await main_message.edit_caption(caption = index_error_text, reply_markup=keyboard_back_to_index)
 
 @user_router.message(F.photo)
 async def photo_test(message: Message):

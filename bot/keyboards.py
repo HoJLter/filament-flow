@@ -33,6 +33,16 @@ keyboard_order_menu = InlineKeyboardMarkup(inline_keyboard=[[name_button,
                                                             [back_to_start_button]])
 
 
+valid_index_button = InlineKeyboardButton(text="Да ✅", callback_data="valid_index")
+other_index_button = InlineKeyboardButton(text="Нет ❌", callback_data="other_index")
+keyboard_index_confirmation = InlineKeyboardMarkup(inline_keyboard=[[valid_index_button],
+                                                                   [other_index_button]])
+
+
+back_to_index_button = InlineKeyboardButton(text = "Назад ⬅️", callback_data="back_to_index")
+keyboard_back_to_index = InlineKeyboardMarkup(inline_keyboard=[[back_to_index_button]])
+
+
 back_to_order_button = InlineKeyboardButton(text="Назад ⬅️️", callback_data="back_to_order_menu")
 keyboard_back_to_order = InlineKeyboardMarkup(inline_keyboard=[[back_to_order_button]])
 
