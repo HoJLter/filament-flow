@@ -27,7 +27,7 @@ async def get_file_url() -> str:
 async def unpack_zip(path):
     """Распаковываю zip-архив"""
     with ZipFile(path, 'r') as file:
-        file.extractall("../data/")
+        file.extractall("data/")
         return file.namelist()
 
 
@@ -35,7 +35,7 @@ async def download_dbf():
     """Скачиваю файл, используя ссылку, полученную от функции get_file_url"""
     url = await get_file_url()
     response = requests.get(url).content
-    path = "../data/mail_idx.zip"
+    path = "data/mail_idx.zip"
     with open(path,"wb") as file:
         file.write(response)
     dbf_name = await unpack_zip(path)
@@ -56,7 +56,7 @@ async def fill_index_database():
     dbf_name = await download_dbf()
     pool = await asyncpg.create_pool(user=database_config['user'], password=database_config['password'],
                                database=database_config['database'], host=database_config['host'])
-    dbf = DBF(f"../data/{"".join(dbf_name)}")
+    dbf = DBF(f"data/{"".join(dbf_name)}")
     tasks = [insert_task(connection=pool, record=record) for record in dbf]
     await asyncio.gather(*tasks)
     await pool.close()
@@ -76,7 +76,7 @@ async def check_updates():
                 hash_object.update(bytecode)
                 new_hash = hash_object.hexdigest()
                 # Хеширую параграф.
-                async with aiofiles.open('../data/page_hash.txt', 'r+') as file:
+                async with aiofiles.open('data/page_hash.txt', 'r+') as file:
                     old_hash = await file.read()
                     await file.seek(0)
                     await file.write(new_hash)
@@ -96,4 +96,11 @@ async def truncate_mail_indexes():
     await connection.close()
 
 
-asyncio.run(check_updates())
+async def fill_clients_info(user_id, first_name, last_name, username):
+    """Заполнение таблицы с информацией о пользователе"""
+    try:
+        connection = await asyncpg.connect(**database_config)
+        await connection.execute("INSERT INTO clients (id, first_name, last_name, username, order_count)"
+                                 f"VALUES ({user_id}, '{first_name}', '{last_name}', '{username}', 0)")
+    except:
+        pass

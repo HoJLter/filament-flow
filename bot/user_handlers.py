@@ -1,5 +1,6 @@
 #Телеграм API
 import re
+from datetime import datetime
 
 from aiogram import Router, F
 from aiogram.enums import ContentType
@@ -17,6 +18,9 @@ from bot.texts import *
 from bot.keyboards import keyboard_start_gen, keyboard_back_to_start, keyboard_order_menu, keyboard_admin_panel, \
     keyboard_back_to_order, keyboard_index_confirmation, keyboard_back_to_index
 from config import database_config
+from database_management.database_filling import fill_clients_info
+
+
 user_router = Router()
 
 
@@ -25,6 +29,13 @@ async def welcome_command(message: Message, state: FSMContext):
     await state.set_state(StatesData.none_state)
     await message.delete()
     user = message.from_user
+    user_data = {
+        'user_id':user.id,
+        'first_name':user.first_name,
+        'last_name':user.last_name,
+        'username':user.username
+    }
+    await fill_clients_info(**user_data)
     await state.update_data(user=user)
     master_msg = await message.answer_photo(photo=image_welcome , caption=text_welcome,
                                             reply_markup=await keyboard_start_gen(user_id=message.from_user.id))
@@ -102,10 +113,52 @@ async def set_order_parameters(callback: CallbackQuery, state: FSMContext):
         await state.set_state(StatesData.waiting_for_file)
 
     elif callback.data == "complete_button":
-        temp_message = await callback.message.answer(text = text_order_edit_complete)
-        await asyncio.sleep(4)
-        await temp_message.delete()
+        order_parameters = (await state.get_data())['order_parameters']
+        print(order_parameters)
+        if all(parameter for parameter in order_parameters.values()):
+            connection = await asyncpg.connect(**database_config)
+            now = datetime.now()
+            user = (await state.get_data())['user']
+            reg_date = datetime.strftime(now, "%Y-%m-%d %H:%M:%S")
+            await connection.execute(f'UPDATE clients SET order_count = order_count + 1 WHERE id = {user.id}')
 
+            order_id = await connection.fetchval("INSERT INTO orders (client_id, reg_date, status)"
+                                                 f"VALUES ('{user.id}', '{reg_date}', 'НА РАССМОТРЕНИИ') RETURNING id")
+
+            await connection.execute("INSERT INTO order_info(order_id, reference, mail_idx, order_name, file_id) "
+                                     f"VALUES ({order_id}, '{order_parameters['reference']}', {order_parameters['mail_index']}, "
+                                     f"'{order_parameters['order_name']}', '{order_parameters['file_id']}')")
+
+            await connection.close()
+            await state.update_data(order_name=None, mail_index=None, advices=None)
+            temporal_message = await callback.message.answer(text_order_edit_complete)
+            await state.set_state(StatesData.none_state)
+
+            order_parameters = {
+                'order_name': None,
+                'reference': None,
+                'mail_index': None,
+                'file_id': None,
+                'file_name': None
+            }
+
+            await state.update_data(order_parameters=order_parameters)
+            await callback.message.edit_media(media=InputMediaPhoto(media=image_order_menu,
+                                                                    caption=await text_order_menu_gen(state)),
+                                              reply_markup=keyboard_order_menu)
+
+            await asyncio.sleep(3)
+            await temporal_message.delete()
+        else:
+            temporal_message = await callback.message.answer(text=text_order_edit_failed)
+            await asyncio.sleep(3)
+            await temporal_message.delete()
+
+
+@user_router.callback_query(lambda callback: callback.data == "valid_index")
+async def valid_index(callback: CallbackQuery, state: FSMContext):
+
+    await back_to_order_config(state)
 
 
 @user_router.message(StateFilter(StatesData.waiting_for_references,
@@ -121,7 +174,7 @@ async def set_simple_params(message: Message, state:FSMContext):
 
     elif current_state == StatesData.waiting_for_references:
         await message.delete()
-        order_parameters['references'] = message.text
+        order_parameters['reference'] = message.text
         await back_to_order_config(state)
 
 
@@ -199,13 +252,26 @@ async def set_index(message: Message, state: FSMContext):
 
         formatted_location = " ".join(location.split())
         await message.delete()
+        order_parameters = (await state.get_data())['order_parameters']
+        order_parameters['mail_index'] = response['index']
+        await state.update_data(order_parameters=order_parameters)
         await main_message.edit_caption(caption = f"Вы указали индекс {response['index']}. "
                                             f"Он соответствует региону {formatted_location}."
                                             f"\nЭто верно?", reply_markup=keyboard_index_confirmation)
+
     else:
         await message.delete()
         await state.update_data(mail_index=None)
         await main_message.edit_caption(caption = index_error_text, reply_markup=keyboard_back_to_index)
+
+
+@user_router.callback_query(lambda callback: callback.data == "other_index")
+@user_router.callback_query(lambda callback: callback.data == "index_error")
+async def index_error(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(mail_index=None)
+    await mail_indexes(callback, state)
+
+
 
 @user_router.message(F.photo)
 async def photo_test(message: Message):
