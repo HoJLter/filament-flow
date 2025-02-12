@@ -262,7 +262,7 @@ async def set_index(message: Message, state: FSMContext):
     else:
         await message.delete()
         await state.update_data(mail_index=None)
-        await main_message.edit_caption(caption = index_error_text, reply_markup=keyboard_back_to_index)
+        await main_message.edit_caption(caption = text_index_error, reply_markup=keyboard_back_to_index)
 
 
 @user_router.callback_query(lambda callback: callback.data == "other_index")

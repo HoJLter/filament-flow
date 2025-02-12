@@ -98,3 +98,31 @@ async def gen_settings_keyboard(state: FSMContext):
     printing_settings_keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard)
 
     return printing_settings_keyboard
+
+
+
+model_search_button = InlineKeyboardButton(text="Поиск 🔎", callback_data="model_search")
+keyboard_models_lib_menu = InlineKeyboardMarkup(inline_keyboard=[[model_search_button],
+                                                                 [back_to_start_button]])
+
+
+back_to_lib_menu_button = InlineKeyboardButton(text="Назад ⬅️", callback_data="back_to_lib_menu")
+keyboard_back_to_lib_menu = InlineKeyboardMarkup(inline_keyboard=[[back_to_lib_menu_button]])
+
+
+
+
+async def keyboard_choose_model(model_id):
+    choose_model_button = InlineKeyboardButton(text = f"Выбрать модель №{model_id}", callback_data=f"choose_model{model_id}")
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[choose_model_button]])
+    return keyboard
+
+
+async def keyboard_page_change(page_number, state: FSMContext):
+    pages = (await state.get_data())['pages']
+    back_page_button = InlineKeyboardButton(text= "Назад ⬅️", callback_data=f"page_{max(page_number-1, 0)}")
+    next_page_button = InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"page_{min(page_number + 1, len(pages))}")
+    back_to_order_menu_button = InlineKeyboardButton(text="Назад к оформлению заказа ⬇️", callback_data="back_to_lib")
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[back_page_button, next_page_button],
+                                                     [back_to_order_menu_button]])
+    return keyboard

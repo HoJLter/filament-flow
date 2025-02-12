@@ -15,3 +15,6 @@ class StatesData(StatesGroup):
     waiting_for_table_temp = State()
     waiting_for_printing_speed = State()
     waiting_for_layer_thickness = State()
+
+    #Состояния для фич
+    waiting_for_search = State()

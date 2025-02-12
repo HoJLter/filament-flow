@@ -47,10 +47,12 @@ async def order_settings(ord_number, state: FSMContext):
     )
     return text
 
-index_error_text = ("Такой индекс не был найден в нашей базе данных."
+text_index_error = ("Такой индекс не был найден в нашей базе данных."
                     " Вы уверены, что указали почтовый индекс правильно?"
                     " Если да, то можете обратиться к нашему менеджеру")
 
+
+text_models_lib = "Это библиотека моделей. Здесь можно скачать модель, чтобы отправить её на печать."
 
 image_welcome = 'AgACAgIAAxkBAAMlZ6d-h1N3fvQFev8E-TQtkyP34koAAv_nMRsMpDlJUhOUiCC7cOcBAAMCAAN5AAM2BA'
 image_info = 'AgACAgIAAxkBAAMnZ6d-9vFn8AruU4cTC4dZ3aD9eVwAAgroMRsMpDlJ1wvosAABucJEAQADAgADeQADNgQ'
@@ -60,3 +62,4 @@ image_reference = 'AgACAgIAAxkBAAMrZ6d_U1RD2L3_Rm5ytn6sb_OyFtUAAg7oMRsMpDlJxRGx-
 image_mail_indexes = 'AgACAgIAAxkBAAPkZ6hn7uensVsF9J4ZoNjRfc2B8tIAAoTlMRsMpEFJsvmlZWnVahUBAAMCAAN5AAM2BA'
 image_file = 'AgACAgIAAxkBAAMtZ6d_dxWtd6PB1ANuhHtghnzQVXUAAhHoMRsMpDlJF0gkwUfvaOIBAAMCAAN5AAM2BA'
 image_admin_panel = "AgACAgIAAxkBAAMuZ6d_g4UvP7ox-nVgweLCw67Q75EAAhLoMRsMpDlJ7L5rcxWTxAABAQADAgADeQADNgQ"
+image_models_lib_menu = "AgACAgIAAxkBAAIBX2eqTc2f6r5zG--KRGmLybbjc6BrAAL67DEbeadYSSrhebGYeMhgAQADAgADeQADNgQ"

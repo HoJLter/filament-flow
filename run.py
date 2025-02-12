@@ -17,6 +17,7 @@ async def run_bot():
     dp = Dispatcher()
     dp.include_router(user_router)
     dp.include_router(admin_router)
+
     print("[INFO] SESSION HAS BEEN OPENED")
     await dp.start_polling(bot)
 
