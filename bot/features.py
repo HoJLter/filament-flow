@@ -27,7 +27,7 @@ async def show_lib_menu(message: Message, state: FSMContext):
 @features_router.callback_query(lambda callback: callback.data == "model_search")
 async def search_request(callback: CallbackQuery, state: FSMContext):
     """Просьба ввести поисковой запрос"""
-    await callback.message.edit_caption(caption="Введите поисковой запрос:", reply_markup=keyboard_back_to_lib_menu)
+    await callback.message.edit_caption(caption="Введите поисковой запрос (на английском):", reply_markup=keyboard_back_to_lib_menu)
     await state.set_state(StatesData.waiting_for_search)
 
 
@@ -66,20 +66,19 @@ async def search_processing(message: Message, state: FSMContext):
                            f"Дата публикации: {publish_date}\n"
                            f"Автор: {user['profileUrl']}\n"
                            f"UID модели: {model_uid}\n"
-                           f"[Предпросмотр модели]({viewer_url})",
+                           f"<a href='{viewer_url}'>Предпросмотр модели</a>",
                 'reply_markup': await keyboard_choose_model(model_id),
-                'parse_mode':'Markdown'
+                'parse_mode':'HTML'
             })
 
         pages = [models_info[i:i + 5] for i in range(0, len(models_info), 5)]
-        print(pages)
         await state.update_data(pages=pages)
 
         temp_page = []
         for model in pages[0]:
             temp_page.append(await message.answer_photo(**model))
 
-        await message.answer(text = "*|---------------|Это конец страницы №1|---------------|*",
+        await message.answer(text ="*|---------------------|Это конец страницы №1|---------------------|*",
                              reply_markup=await keyboard_page_change(0, state),
                              parse_mode="Markdown")
         await state.update_data(temp_page=temp_page)
@@ -88,19 +87,32 @@ async def search_processing(message: Message, state: FSMContext):
 
 @features_router.callback_query(lambda callback: callback.data.startswith("page"))
 async def page_switch(callback: CallbackQuery, state: FSMContext):
-    page_number = int(callback.data.split("_")[-1])
+
     data = await state.get_data()
     temp_page = data['temp_page']
     pages = data['pages']
+
+    page_number = min(int(callback.data.split("_")[-1]), len(pages)-1)
+
     for message in temp_page:
         await message.delete()
+
     temp_page = []
     await callback.message.delete()
     for model in pages[page_number]:
         temp_page.append(await callback.message.answer_photo(**model))
     await state.update_data(temp_page=temp_page)
 
-    await callback.message.answer(text=f"*|---------------|Это конец страницы №{page_number+1}|---------------|*",
+    await callback.message.answer(text=f"*|---------------------|Это конец страницы №{page_number+1}|---------------------|*",
                                   reply_markup=await keyboard_page_change(page_number, state),
                                   parse_mode="Markdown")
 
+
+@features_router.callback_query(lambda callback: callback.data == "back_to_lib")
+async def back_to_lib_menu(callback:CallbackQuery, state: FSMContext):
+    temp_page = (await state.get_data())['temp_page']
+    for msg in temp_page:
+        await msg.delete()
+    await callback.message.delete()
+    await callback.message.answer_photo(photo=image_models_lib_menu, caption=text_models_lib,
+                               reply_markup=keyboard_models_lib_menu)

@@ -122,7 +122,7 @@ async def keyboard_page_change(page_number, state: FSMContext):
     pages = (await state.get_data())['pages']
     back_page_button = InlineKeyboardButton(text= "Назад ⬅️", callback_data=f"page_{max(page_number-1, 0)}")
     next_page_button = InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"page_{min(page_number + 1, len(pages))}")
-    back_to_order_menu_button = InlineKeyboardButton(text="Назад к оформлению заказа ⬇️", callback_data="back_to_lib")
+    back_to_order_menu_button = InlineKeyboardButton(text="⬇️ Обратно в меню ⬇️", callback_data="back_to_lib")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[back_page_button, next_page_button],
                                                      [back_to_order_menu_button]])
     return keyboard
