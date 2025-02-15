@@ -3,6 +3,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from config import admin_ids
 from aiogram.fsm.context import FSMContext
 
+
 async def keyboard_start_gen(user_id):
     create_order_button = InlineKeyboardButton(text = "Оформить заказ 🖋", callback_data="create_order")
     info_button = InlineKeyboardButton(text = "Информация 📖", callback_data="info")
@@ -103,17 +104,17 @@ async def gen_settings_keyboard(state: FSMContext):
 
 model_search_button = InlineKeyboardButton(text="Поиск 🔎", callback_data="model_search")
 keyboard_models_lib_menu = InlineKeyboardMarkup(inline_keyboard=[[model_search_button],
-                                                                 [back_to_start_button]])
+                                                                 [back_to_order_button]])
 
 
-back_to_lib_menu_button = InlineKeyboardButton(text="Назад ⬅️", callback_data="back_to_lib_menu")
+back_to_lib_menu_button = InlineKeyboardButton(text="Назад ⬅️", callback_data="back_to_lib")
 keyboard_back_to_lib_menu = InlineKeyboardMarkup(inline_keyboard=[[back_to_lib_menu_button]])
 
 
 
 
-async def keyboard_choose_model(model_id):
-    choose_model_button = InlineKeyboardButton(text = f"Выбрать модель №{model_id}", callback_data=f"choose_model{model_id}")
+async def keyboard_choose_model(model_id, uid, model_name):
+    choose_model_button = InlineKeyboardButton(text = f"Выбрать модель №{model_id}", callback_data=f"{uid}")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[choose_model_button]])
     return keyboard
 
@@ -126,3 +127,10 @@ async def keyboard_page_change(page_number, state: FSMContext):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[back_page_button, next_page_button],
                                                      [back_to_order_menu_button]])
     return keyboard
+
+
+
+go_to_lib_button = InlineKeyboardButton(text="В библиотеку моделей 📚", callback_data="lib_menu")
+keyboard_file_send = InlineKeyboardMarkup(inline_keyboard=[[go_to_lib_button],
+                                                            [back_to_order_button],
+                                                            ])

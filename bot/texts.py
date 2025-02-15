@@ -52,7 +52,6 @@ text_index_error = ("Такой индекс не был найден в наш�
                     " Если да, то можете обратиться к нашему менеджеру")
 
 
-text_models_lib = "Это библиотека моделей. Здесь можно скачать модель, чтобы отправить её на печать."
 
 image_welcome = 'AgACAgIAAxkBAAMlZ6d-h1N3fvQFev8E-TQtkyP34koAAv_nMRsMpDlJUhOUiCC7cOcBAAMCAAN5AAM2BA'
 image_info = 'AgACAgIAAxkBAAMnZ6d-9vFn8AruU4cTC4dZ3aD9eVwAAgroMRsMpDlJ1wvosAABucJEAQADAgADeQADNgQ'

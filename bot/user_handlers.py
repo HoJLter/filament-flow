@@ -6,19 +6,21 @@ from aiogram import Router, F
 from aiogram.enums import ContentType
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery, InputMediaPhoto, User
+from aiogram.types import Message, CallbackQuery, InputMediaPhoto, User, URLInputFile
 #Асинхронность
 import asyncio
 #База данных
 import asyncpg
 
+from bot.features import get_coordinates, get_static_map
 #Импорты из проекта
 from bot.fsm import StatesData
 from bot.texts import *
 from bot.keyboards import keyboard_start_gen, keyboard_back_to_start, keyboard_order_menu, keyboard_admin_panel, \
-    keyboard_back_to_order, keyboard_index_confirmation, keyboard_back_to_index
+    keyboard_back_to_order, keyboard_index_confirmation, keyboard_back_to_index, keyboard_file_send
 from config import database_config
 from database_management.database_filling import fill_clients_info
+from PIL import Image
 
 
 user_router = Router()
@@ -53,11 +55,12 @@ async def welcome_command(message: Message, state: FSMContext):
 async def main_menus(callback:CallbackQuery, state: FSMContext):
     if callback.data == "create_order":
         order_parameters = {
-            'order_name':None,
-            'reference':None,
-            'mail_index':None,
-            'file_id':None,
-            'file_name': None
+            'order_name': None,
+            'reference': None,
+            'mail_index': None,
+            'file_id': None,
+            'file_uid': None,
+            'file_name': None,
         }
         await state.update_data(order_parameters=order_parameters)
         await callback.message.edit_media(media=InputMediaPhoto(media=image_order_menu,
@@ -109,7 +112,7 @@ async def set_order_parameters(callback: CallbackQuery, state: FSMContext):
 
     elif callback.data == "send_file":
         await callback.message.edit_media(media=InputMediaPhoto(media=image_file, caption="Отправьте .stl модель для печати"),
-                                          reply_markup=keyboard_back_to_order)
+                                          reply_markup=keyboard_file_send)
         await state.set_state(StatesData.waiting_for_file)
 
     elif callback.data == "complete_button":
@@ -139,7 +142,8 @@ async def set_order_parameters(callback: CallbackQuery, state: FSMContext):
                 'reference': None,
                 'mail_index': None,
                 'file_id': None,
-                'file_name': None
+                'file_uid': None,
+                'file_name': None,
             }
 
             await state.update_data(order_parameters=order_parameters)
@@ -211,12 +215,6 @@ async def set_file(message: Message, state: FSMContext):
         await temporary_message.delete()
         await state.set_state(StatesData.waiting_for_file)
 
-        # order_parameters = {
-        #     'order_name':None,
-        #     'reference':None,
-        #     'mail_index':None,
-        #     'file_id':None
-        # }
 
 @user_router.callback_query(lambda callback: callback.data == "back_to_index")
 @user_router.callback_query(lambda callback: callback.data == 'mail_index')
@@ -255,9 +253,18 @@ async def set_index(message: Message, state: FSMContext):
         order_parameters = (await state.get_data())['order_parameters']
         order_parameters['mail_index'] = response['index']
         await state.update_data(order_parameters=order_parameters)
-        await main_message.edit_caption(caption = f"Вы указали индекс {response['index']}. "
-                                            f"Он соответствует региону {formatted_location}."
-                                            f"\nЭто верно?", reply_markup=keyboard_index_confirmation)
+        try:
+            cords = await get_coordinates(formatted_index)
+            maps = await get_static_map(cords)
+            await main_message.edit_media(media=InputMediaPhoto(media=maps,
+                                                caption = f"Вы указали индекс {response['index']}. "
+                                                f"Он соответствует региону {formatted_location}."
+                                                f"\nЭто верно?"), reply_markup=keyboard_index_confirmation)
+        except Exception as e:
+            print(e)
+            await main_message.edit_caption(caption = f"Вы указали индекс {response['index']}. "
+                                                f"Он соответствует региону {formatted_location}."
+                                                f"\nЭто верно?", reply_markup=keyboard_index_confirmation)
 
     else:
         await message.delete()
@@ -270,7 +277,6 @@ async def set_index(message: Message, state: FSMContext):
 async def index_error(callback: CallbackQuery, state: FSMContext):
     await state.update_data(mail_index=None)
     await mail_indexes(callback, state)
-
 
 
 @user_router.message(F.photo)
