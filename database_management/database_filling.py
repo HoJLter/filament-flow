@@ -42,12 +42,23 @@ async def download_dbf():
     return dbf_name
 
 
-async def insert_task(connection, record):
+async def insert_task(connection, value):
     """Создание задачи"""
-    locs_array = [record["REGION"], record["AUTONOM"], record["AREA"], record["CITY"], record["CITY_1"]]
-    await connection.execute(f"INSERT INTO mail_indexes(index, region, autonom, area, city, city_1)"
-                               f"VALUES ({record["INDEX"]},'{locs_array[0]}','{locs_array[1]}',"
-                             f"'{locs_array[2]}','{locs_array[3]}','{locs_array[4]}')")
+    await connection.execute(f"INSERT INTO filflow_scheme.mail_indexes(id_mail, region, autonom, area, city, city_1)"
+                               f"VALUES {value}")
+
+
+async def create_insert_array(dbf):
+    all_idx = [[record["INDEX"],record["REGION"], record["AUTONOM"], record["AREA"], record["CITY"], record["CITY_1"]] for record in dbf]
+    batched_idx = [all_idx[i:i+1000] for i in range(0, len(all_idx), 1000)]
+    res = []
+    for idx_ar in batched_idx:
+        temp_values = ""
+        for idx in idx_ar:
+            temp_values+=(f"({idx[0]}, '{idx[1]}', '{idx[2]}', "
+                          f"'{idx[3]}','{idx[4]}','{idx[5]}'),")
+        res.append(temp_values[0:-1])
+    return res
 
 
 async def fill_index_database():
@@ -57,7 +68,8 @@ async def fill_index_database():
     pool = await asyncpg.create_pool(user=database_config['user'], password=database_config['password'],
                                database=database_config['database'], host=database_config['host'])
     dbf = DBF(f"data/{"".join(dbf_name)}")
-    tasks = [insert_task(connection=pool, record=record) for record in dbf]
+    values_to_insert = await create_insert_array(dbf)
+    tasks = [insert_task(connection=pool, value=value) for value in values_to_insert]
     await asyncio.gather(*tasks)
     await pool.close()
 
@@ -100,7 +112,7 @@ async def fill_clients_info(user_id, first_name, last_name, username):
     """Заполнение таблицы с информацией о пользователе"""
     try:
         connection = await asyncpg.connect(**database_config)
-        await connection.execute("INSERT INTO clients (id, first_name, last_name, username, order_count)"
+        await connection.execute("INSERT INTO clients (id_client, first_name, last_name, username, order_count)"
                                  f"VALUES ({user_id}, '{first_name}', '{last_name}', '{username}', 0)")
     except:
         pass

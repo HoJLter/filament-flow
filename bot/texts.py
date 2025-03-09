@@ -9,10 +9,11 @@ text_info = ("✍️ Для оформления заказа заполните
 
 text_order_edit_complete = "Оформление завершено ✅ Скоро с вами свяжется администратор для уточнения деталей"
 text_order_edit_failed = "Ошибка ‼️ Вы заполнили не все детали о заказе"
-
+text_models_lib = "Добро пожаловать в библиотеку моделей. Здесь можно найти .stl модели для печати"
 
 text_admin_panel = ("Админ-панель позволяет взаимодействовать с покупателями,"
                     "проверять заказы и смотреть статистику бота.")
+
 async def text_order_menu_gen(state: FSMContext):
     data = (await state.get_data())['order_parameters']
     text =(

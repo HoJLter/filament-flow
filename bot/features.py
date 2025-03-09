@@ -1,5 +1,6 @@
 import json
 
+import aiofiles
 import aiogram
 import asyncio
 import aiohttp
@@ -185,8 +186,33 @@ async def get_coordinates(search_request):
 async def get_static_map(cords):
     static_apikey = 'e28bffb5-07a8-456a-9a94-fab9adf615ee'
     image = URLInputFile(
-        f"https://static-maps.yandex.ru/v1?apikey={static_apikey}&ll={cords[1]},{cords[0]}&lang=ru_RU&size=450,250&spn=0.01,0.01",
+        f"https://static-maps.yandex.ru/v1?apikey={static_apikey}&ll={cords[1]},{cords[0]}&lang=ru_RU&size=450,250&spn=0.03,0.03",
         filename="map.png")
     return image
 
+# -----------------------------------------------------------------------------------------------
+# СКАНИРОВАНИЕ НА ВИРУСЫ
+async def virus_scan(file):
+    """Сканирование на вирусы с помощью API virustotal"""
+    send_file_url = 'https://www.virustotal.com/api/v3/files'
 
+    header = {
+        'x-apikey': '759aa67d69e969ef6778115aa207c7b1590cbc3564bf409a6dae1e31322c7790'
+    }
+
+    data = aiohttp.FormData()
+    data.add_field("file", file, filename="test", content_type='application/octet-stream')
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(send_file_url, headers=header, data=data) as response:
+            analise_id = (await response.json())['data']['id']
+            analise_url = f'https://www.virustotal.com/api/v3/analyses/{analise_id}'
+
+            await asyncio.sleep(10)
+
+            async with session.get(analise_url, headers=header) as response:
+                stats =  (await response.json())['data']['attributes']['stats']
+                if stats['undetected']>30:
+                    return False
+                else:
+                    return True

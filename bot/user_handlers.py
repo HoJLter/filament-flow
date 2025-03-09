@@ -2,6 +2,7 @@
 import re
 from datetime import datetime
 
+import aiohttp
 from aiogram import Router, F
 from aiogram.enums import ContentType
 from aiogram.filters import Command, CommandStart, StateFilter
@@ -12,7 +13,7 @@ import asyncio
 #База данных
 import asyncpg
 
-from bot.features import get_coordinates, get_static_map
+from bot.features import get_coordinates, get_static_map, virus_scan
 #Импорты из проекта
 from bot.fsm import StatesData
 from bot.texts import *
@@ -21,6 +22,7 @@ from bot.keyboards import keyboard_start_gen, keyboard_back_to_start, keyboard_o
 from config import database_config
 from database_management.database_filling import fill_clients_info
 from PIL import Image
+from config import TOKEN
 
 
 user_router = Router()
@@ -123,12 +125,12 @@ async def set_order_parameters(callback: CallbackQuery, state: FSMContext):
             now = datetime.now()
             user = (await state.get_data())['user']
             reg_date = datetime.strftime(now, "%Y-%m-%d %H:%M:%S")
-            await connection.execute(f'UPDATE clients SET order_count = order_count + 1 WHERE id = {user.id}')
+            await connection.execute(f'UPDATE clients SET order_count = order_count + 1 WHERE id_client= {user.id}')
 
-            order_id = await connection.fetchval("INSERT INTO orders (client_id, reg_date, status)"
+            order_id = await connection.fetchval("INSERT INTO orders (id_client, reg_date, status)"
                                                  f"VALUES ('{user.id}', '{reg_date}', 'НА РАССМОТРЕНИИ') RETURNING id")
-
-            await connection.execute("INSERT INTO order_info(order_id, reference, mail_idx, order_name, file_id) "
+            print(len(order_parameters['file_id']))
+            await connection.execute("INSERT INTO order_info(order_id, reference, mail_idx, order_name, id_tg_file) "
                                      f"VALUES ({order_id}, '{order_parameters['reference']}', {order_parameters['mail_index']}, "
                                      f"'{order_parameters['order_name']}', '{order_parameters['file_id']}')")
 
@@ -185,9 +187,12 @@ async def set_simple_params(message: Message, state:FSMContext):
 async def back_to_order_config(state: FSMContext):
     message = (await state.get_data())['master_msg']
     await state.set_state(StatesData.none_state)
-    await message.edit_media(media=InputMediaPhoto(media=image_order_menu,
-                                                            caption=await text_order_menu_gen(state)),
-                                      reply_markup=keyboard_order_menu)
+    try:
+        await message.edit_media(media=InputMediaPhoto(media=image_order_menu,
+                                                                caption=await text_order_menu_gen(state)),
+                                          reply_markup=keyboard_order_menu)
+    except:
+        pass
 
 
 @user_router.message(StatesData.waiting_for_file)
@@ -197,6 +202,26 @@ async def set_file(message: Message, state: FSMContext):
         if (message.content_type == ContentType.DOCUMENT and
             message.document.file_name.lower().endswith(".stl")):
             order_parameters = (await state.get_data())['order_parameters']
+            try:
+                file_info_url = f'https://api.telegram.org/bot{TOKEN}/getFile?file_id={message.document.file_id}'
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(file_info_url) as file_info:
+                        response_json = await file_info.json()
+                        if response_json['ok']:
+                            file_path = response_json['result']['file_path']
+                            download_url = f'https://api.telegram.org/file/bot{TOKEN}/{file_path}'
+                            async with session.get(download_url) as response:
+                                file_bytes = response.content
+                                temp_msg = await message.answer(text="Подождите 10 секунд.. Файл проверяется на вирусы.")
+                                is_virus=await virus_scan(file_bytes)
+                                await temp_msg.delete()
+                                if is_virus == False:
+                                    order_parameters['file_name'] = message.document.file_name
+                                    order_parameters['file_id'] = message.document.file_id
+                                    await back_to_order_config(state)
+                                    await state.set_state(StatesData.none_state)
+            except Exception as e:
+                print(e)
             order_parameters['file_name'] = message.document.file_name
             order_parameters['file_id'] = message.document.file_id
             await back_to_order_config(state)
@@ -208,9 +233,13 @@ async def set_file(message: Message, state: FSMContext):
             await asyncio.sleep(6)
             await temporary_message.delete()
             await state.set_state(StatesData.waiting_for_file)
-    except:
+    except Exception as e:
+        print(e)
         temporary_message = await message.answer(text="Неизвестная ошибка ‼️ Попробуйте еще раз")
-        await message.delete()
+        try:
+            await message.delete()
+        except:
+            pass
         await asyncio.sleep(4)
         await temporary_message.delete()
         await state.set_state(StatesData.waiting_for_file)
@@ -229,9 +258,9 @@ async def set_index(message: Message, state: FSMContext):
     connection = await asyncpg.connect(database=database_config['database'], user=database_config['user'],
                                password=database_config['password'], host=database_config['host'])
     formatted_index = re.sub(r'\D','' ,(message.text.replace(" ", "")))
-    response = await connection.fetchrow("SELECT index,region, autonom, area, city, city_1 "
-                                        "FROM public.mail_indexes "
-                                       f"WHERE index={formatted_index or 000000}")
+    response = await connection.fetchrow("SELECT id_mail,region, autonom, area, city, city_1 "
+                                        "FROM filflow_scheme.mail_indexes "
+                                       f"WHERE id_mail={formatted_index or 000000}")
     data = await state.get_data()
     main_message = data['master_msg']
     await state.update_data(mail_index=message.text)
@@ -251,18 +280,17 @@ async def set_index(message: Message, state: FSMContext):
         formatted_location = " ".join(location.split())
         await message.delete()
         order_parameters = (await state.get_data())['order_parameters']
-        order_parameters['mail_index'] = response['index']
+        order_parameters['mail_index'] = response['id_mail']
         await state.update_data(order_parameters=order_parameters)
         try:
             cords = await get_coordinates(formatted_index)
             maps = await get_static_map(cords)
             await main_message.edit_media(media=InputMediaPhoto(media=maps,
-                                                caption = f"Вы указали индекс {response['index']}. "
+                                                caption = f"Вы указали индекс {response['id_mail']}. "
                                                 f"Он соответствует региону {formatted_location}."
                                                 f"\nЭто верно?"), reply_markup=keyboard_index_confirmation)
         except Exception as e:
-            print(e)
-            await main_message.edit_caption(caption = f"Вы указали индекс {response['index']}. "
+            await main_message.edit_caption(caption = f"Вы указали индекс {response['id_mail']}. "
                                                 f"Он соответствует региону {formatted_location}."
                                                 f"\nЭто верно?", reply_markup=keyboard_index_confirmation)
 

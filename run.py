@@ -27,7 +27,10 @@ async def run_bot():
 if __name__ == '__main__':
     try:
         asyncio.run(main())
-    except:
-        print("[INFO] SESSION HAS BEEN CLOSED")
+    except Exception as e:
+        if e != KeyboardInterrupt:
+            print(f'[ERROR] {e}')
+        else:
+            print("[INFO] SESSION HAS BEEN CLOSED")
 
 
