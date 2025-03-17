@@ -16,13 +16,11 @@ import asyncpg
 from bot.features import get_coordinates, get_static_map, virus_scan
 #Импорты из проекта
 from bot.fsm import StatesData
-from bot.statistics.stats import write_regions_statistics
 from bot.texts import *
 from bot.keyboards import keyboard_start_gen, keyboard_back_to_start, keyboard_order_menu, keyboard_admin_panel, \
     keyboard_back_to_order, keyboard_index_confirmation, keyboard_back_to_index, keyboard_file_send
 from config import database_config
 from database_management.database_filling import fill_clients_info
-from PIL import Image
 from config import TOKEN
 
 
@@ -120,16 +118,19 @@ async def set_order_parameters(callback: CallbackQuery, state: FSMContext):
 
     elif callback.data == "complete_button":
         order_parameters = (await state.get_data())['order_parameters']
-        if all([order_parameters['order_name'], order_parameters['reference'], order_parameters['mail_index'],
-               order_parameters['file_name']]) and (order_parameters['file_id'] or order_parameters['file_uid']):
+        print(order_parameters)
+        if ((order_parameters['order_name'] and order_parameters['reference'] and order_parameters['mail_index']) and
+                (order_parameters['file_id'] or order_parameters['file_uid'])):
             connection = await asyncpg.connect(**database_config)
             now = datetime.now()
             user = (await state.get_data())['user']
+
             reg_date = datetime.strftime(now, "%Y-%m-%d %H:%M:%S")
             await connection.execute(f'UPDATE filflow_scheme.clients SET order_count = order_count + 1 WHERE id_client= {user.id}')
 
             order_id = await connection.fetchval("INSERT INTO filflow_scheme.orders (id_client, reg_date, status)"
                                                  f"VALUES ('{user.id}', '{reg_date}', 'НА РАССМОТРЕНИИ') RETURNING id_order")
+            print(len(order_parameters['file_id']))
             await connection.execute("INSERT INTO filflow_scheme.order_info(id_order, reference, id_mail, order_name, id_tg_file) "
                                      f"VALUES ({order_id}, '{order_parameters['reference']}', {order_parameters['mail_index']}, "
                                      f"'{order_parameters['order_name']}', '{order_parameters['file_id']}')")
@@ -138,7 +139,6 @@ async def set_order_parameters(callback: CallbackQuery, state: FSMContext):
             await state.update_data(order_name=None, mail_index=None, advices=None)
             temporal_message = await callback.message.answer(text_order_edit_complete)
             await state.set_state(StatesData.none_state)
-            await write_regions_statistics()
 
             order_parameters = {
                 'order_name': None,

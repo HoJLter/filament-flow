@@ -161,7 +161,7 @@ async def choose_model(callback: CallbackQuery, state: FSMContext):
 # КАРТЫ
 import aiohttp
 from io import BytesIO
-from PIL import Image
+
 
 async def get_coordinates(search_request):
     url = 'https://nominatim.openstreetmap.org/search'
