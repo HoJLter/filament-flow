@@ -119,16 +119,8 @@ async def set_order_parameters(callback: CallbackQuery, state: FSMContext):
     elif callback.data == "complete_button":
         order_parameters = (await state.get_data())['order_parameters']
         print(order_parameters)
-        # order_parameters = {
-        #     'order_name': None,
-        #     'reference': None,
-        #     'mail_index': None,
-        #     'file_id': None,
-        #     'file_uid': None,
-        #     'file_name': None,
-        # }
         if (order_parameters['order_name'] and order_parameters['reference'] and order_parameters['mail_index'] and
-                (order_parameters['file_id']+order_parameters['file_uid']) == 1):
+                (order_parameters['file_id'] or order_parameters['file_uid'])):
             connection = await asyncpg.connect(**database_config)
             now = datetime.now()
             user = (await state.get_data())['user']
