@@ -30,7 +30,7 @@ async def create_order_list(i, order):
             f"\n"
             f"🔖 _Название_: {order['order_name']}\n"
             f"🧩 _Техническое задание_: {order['reference']}\n"
-            f"📭 _Почтовый индекс_: {order['mail_idx']}\n"
+            f"📭 _Почтовый индекс_: {order['id_mail']}\n"
             f"⏳ _Время регистрации_: {order['reg_date']}\n"
             f"🖋 _Имя пользователя_: @{order['username']}")
     return text

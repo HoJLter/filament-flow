@@ -20,7 +20,7 @@ from bot.fsm import StatesData
 from config import admin_ids, database_config
 from bot.texts import *
 from bot.keyboards import *
-
+from bot.statistics import stats
 
 admin_router = Router()
 
@@ -33,29 +33,29 @@ class SettingsFilter(Filter):
         return current_state in self.states
 
 
-# @admin_router.callback_query(lambda callback: callback.data == "statistics_utils")
-# async def view_statistics(callback: CallbackQuery, state: FSMContext):
-#     await callback.message.delete()
-#     statistics = [await create_top_list()]
-#     temporary_messages=[await callback.message.answer(stat) for stat in statistics]
-#     await state.update_data(temporary_messages=temporary_messages)
-#     main_message = await callback.message.answer(text="Это статистика вашего бота. Вернутся назад?",
-#                                                  reply_markup=back_to_admin_keyboard)
-#     await state.update_data(main_message=main_message)
+@admin_router.callback_query(lambda callback: callback.data == "statistics_utils")
+async def view_statistics(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    statistics = [await stats.create_top_list()]
+    temporary_messages=[await callback.message.answer(stat) for stat in statistics]
+    await state.update_data(temporary_messages=temporary_messages)
+    main_message = await callback.message.answer(text="Это статистика вашего бота. Вернутся назад?",
+                                                 reply_markup=back_to_admin_keyboard)
+    await state.update_data(main_message=main_message)
 
 
 @admin_router.callback_query(lambda callback: callback.data == "orders_list")
 async def orders_list(callback: CallbackQuery, state:FSMContext):
     connection: asyncpg.Connection = await asyncpg.connect(**database_config)
-    orders = await connection.fetch("SELECT * FROM orders "
-                                    "INNER JOIN order_info ON orders.id = order_info.order_id "
-                                    "INNER JOIN clients ON orders.client_id = clients.id "
+    orders = await connection.fetch("SELECT * FROM filflow_scheme.orders "
+                                    "INNER JOIN filflow_scheme.order_info ON filflow_scheme.orders.id_order = filflow_scheme.order_info.id_order "
+                                    "INNER JOIN filflow_scheme.clients ON filflow_scheme.orders.id_client = filflow_scheme.clients.id_client "
                                     "WHERE status = 'НА РАССМОТРЕНИИ'")
-    orders = [[order['order_id'], order] for order in orders]
+    orders = [[order['id_order'], order] for order in orders]
     await state.update_data(orders=orders)
     await callback.message.delete()
     temporary_messages = [await callback.message.answer_document(caption=await create_order_list(pair[0], pair[1]),
-                                                                 document=pair[1]['file_id'],
+                                                                 document=pair[1]['id_tg_file'],
                                                                  reply_markup=await create_order_keyboard(pair[0]),
                                                                  parse_mode=ParseMode.MARKDOWN)
                                                                  if orders else await callback.messsage.answer (text="Сейчас заказов нет. Заходите позднее!")
@@ -147,13 +147,21 @@ async def settings_questions(callback: CallbackQuery, state: FSMContext):
 
     elif callback.data == "send_to_print":
         order_num = (await state.get_data())['orders_settings_dict']['current_ord_num']
-        connection = await asyncpg.connect(**database_config)
+        connection: asyncpg.Connection = await asyncpg.connect(**database_config)
         await connection.execute(
-            "UPDATE orders "
+            "UPDATE filflow_scheme.orders "
             "SET status = 'ОДОБРЕН' "
-            f"WHERE id = {order_num}"
+            f"WHERE id_order = {order_num}"
         )
+        user_id = await connection.fetchval(f"""
+        SELECT id_client
+        FROM filflow_scheme.orders
+        WHERE id_order = {order_num}
+        """)
+        print(user_id)
+        await callback.bot.send_message(chat_id=user_id, text="Ваш заказ отправлен на печать! \nСмотреть за процессом:")
         await orders_list(callback, state)
+
 
 async def back_to_settings(message: Message, state: FSMContext):
     order_num = (await state.get_data())['orders_settings_dict']['current_ord_num']

@@ -112,7 +112,7 @@ async def fill_clients_info(user_id, first_name, last_name, username):
     """Заполнение таблицы с информацией о пользователе"""
     try:
         connection = await asyncpg.connect(**database_config)
-        await connection.execute("INSERT INTO clients (id_client, first_name, last_name, username, order_count)"
+        await connection.execute("INSERT INTO filflow_scheme.clients (id_client, first_name, last_name, username, order_count)"
                                  f"VALUES ({user_id}, '{first_name}', '{last_name}', '{username}', 0)")
     except:
         pass

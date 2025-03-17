@@ -6,9 +6,11 @@ from bot.features import features_router
 from config import TOKEN
 from bot.user_handlers import user_router
 from database_management.database_filling import check_updates
+from client.printer_interaction import stl_main
 
 
 async def main():
+    # tasks = [run_bot(), check_updates(), stl_main()]
     tasks = [run_bot(), check_updates()]
     await asyncio.gather(*tasks)
 
