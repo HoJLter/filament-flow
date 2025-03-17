@@ -129,7 +129,7 @@ async def set_order_parameters(callback: CallbackQuery, state: FSMContext):
             await connection.execute(f'UPDATE filflow_scheme.clients SET order_count = order_count + 1 WHERE id_client= {user.id}')
 
             order_id = await connection.fetchval("INSERT INTO filflow_scheme.orders (id_client, reg_date, status)"
-                                                 f"VALUES ('{user.id}', '{reg_date}', 'НА РАССМОТРЕНИИ') RETURNING id")
+                                                 f"VALUES ('{user.id}', '{reg_date}', 'НА РАССМОТРЕНИИ') RETURNING id_order")
             print(len(order_parameters['file_id']))
             await connection.execute("INSERT INTO fiflow_scheme.order_info(id_order, reference, id_mail, order_name, id_tg_file) "
                                      f"VALUES ({order_id}, '{order_parameters['reference']}', {order_parameters['mail_index']}, "
