@@ -21,7 +21,6 @@ from bot.keyboards import keyboard_start_gen, keyboard_back_to_start, keyboard_o
     keyboard_back_to_order, keyboard_index_confirmation, keyboard_back_to_index, keyboard_file_send
 from config import database_config
 from database_management.database_filling import fill_clients_info
-from PIL import Image
 from config import TOKEN
 
 
