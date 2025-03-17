@@ -119,10 +119,20 @@ async def set_order_parameters(callback: CallbackQuery, state: FSMContext):
     elif callback.data == "complete_button":
         order_parameters = (await state.get_data())['order_parameters']
         print(order_parameters)
-        if all(parameter for parameter in order_parameters.values()):
+        # order_parameters = {
+        #     'order_name': None,
+        #     'reference': None,
+        #     'mail_index': None,
+        #     'file_id': None,
+        #     'file_uid': None,
+        #     'file_name': None,
+        # }
+        if (order_parameters['order_name'] and order_parameters['reference'] and order_parameters['mail_index'] and
+                (order_parameters['file_id']+order_parameters['file_uid']) == 1):
             connection = await asyncpg.connect(**database_config)
             now = datetime.now()
             user = (await state.get_data())['user']
+
             reg_date = datetime.strftime(now, "%Y-%m-%d %H:%M:%S")
             await connection.execute(f'UPDATE filflow_scheme.clients SET order_count = order_count + 1 WHERE id_client= {user.id}')
 
