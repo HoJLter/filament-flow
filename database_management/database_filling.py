@@ -42,6 +42,8 @@ async def download_dbf():
     return dbf_name
 
 
+
+
 async def insert_task(connection, value):
     """Создание задачи"""
     await connection.execute(f"INSERT INTO filflow_scheme.mail_indexes(id_mail, region, autonom, area, city, city_1)"
